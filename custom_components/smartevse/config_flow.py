@@ -56,7 +56,7 @@ class SmartEVSEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             await self.validate_smartevse_connection()
         except CannotConnect:
-            return await self.async_abort(reason="Could not connect to device:%s" % (self._host))
+            return self.async_abort(reason="Could not connect to device:%s" % (self._host))
 
         return await self.async_step_options()
 
