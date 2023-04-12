@@ -45,21 +45,20 @@ class SmartEVSEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._serial = discovery_info.hostname.replace(".local.", "").replace(
             "SmartEVSE-", ""
         )
+
+        _LOGGER.info(f"Host is {discovery_info.host}")
+        self._host = str(discovery_info.host)
+
         await self.async_set_unique_id(self._serial)
-        self._abort_if_unique_id_configured()
+        self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
 
-        for suffix in [".local", ".lan", ""]:
-            self._host = "SmartEVSE-" + self._serial + suffix
-            # Attempt to make a connection to the local device and abort if not possible
-            err = False
-            try:
-                await self.validate_smartevse_connection()
-            except CannotConnect:
-                err = True
-            if not err:
-                return await self.async_step_options()
+        # Attempt to make a connection to the local device and abort if not possible
+        try:
+            await self.validate_smartevse_connection()
+        except CannotConnect:
+            return await self.async_abort(reason="Could not connect to device:%s" % (self._host))
 
-        return self.async_abort(reason="Could not connect to device:%s" % (self._host))
+        return await self.async_step_options()
 
     async def validate_smartevse_connection(self):
         self.response = await self.hass.async_add_executor_job(self.get_data)
@@ -67,8 +66,11 @@ class SmartEVSEConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def get_data(self):
         api_url = "http://" + self._host + "/settings"
         try:
+            _LOGGER.info(f"Reading data from {api_url}")
             requests.get(api_url, timeout=10).json()
+            _LOGGER.info("Request succesful")
         except requests.exceptions.RequestException as e:
+            _LOGGER.warning(f"Failed to connect: {e}")
             raise CannotConnect("Cannot connect to url:%s" % (api_url))
 
     async def async_step_user(
